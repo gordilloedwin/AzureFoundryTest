@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 
 # Claude Code
 CLAUDE.md
+
+# Captured SDK responses (demo artifacts, regenerated on every request)
+responses/
