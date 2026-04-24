@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using AzureFoundryTest.Services.Interfaces;
 
 namespace AzureFoundryTest.Controllers;
 
@@ -6,6 +7,13 @@ namespace AzureFoundryTest.Controllers;
 [Route("api/[controller]")]
 public class AgentController : ControllerBase
 {
+    private readonly IChatService _chatService;
+
+    public AgentController(IChatService chatService)
+    {
+        _chatService = chatService;
+    }
+
     [HttpPost("ask-agent")]
     public async Task<ActionResult<string>> AskAgent([FromBody] AskAgentRequest request)
     {
@@ -14,9 +22,9 @@ public class AgentController : ControllerBase
             return BadRequest("Input cannot be empty.");
         }
 
-        await Task.CompletedTask;
+        string response = await _chatService.AskAgentAsync(request.Input);
 
-        return Ok($"Agent response: {request.Input}");
+        return Ok(response);
     }
 }
 

@@ -1,10 +1,13 @@
 using AzureFoundryTest.Swagger;
+using AzureFoundryTest.Services;
+using AzureFoundryTest.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddScoped<IChatService, ChatService>();
 builder.Services.AddSwaggerGen(options =>
 {
     options.OperationFilter<AskAgentOperationFilter>();
