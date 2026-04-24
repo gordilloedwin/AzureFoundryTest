@@ -8,14 +8,14 @@ namespace AzureFoundryTest.Controllers;
 public class AgentController(IChatService chatService) : ControllerBase
 {
     [HttpPost("ask-agent")]
-    public async Task<ActionResult<string>> AskAgent([FromBody] AskAgentRequest request)
+    public async Task<ActionResult<string>> AskAgent([FromBody] AskAgentRequest request, CancellationToken cancellationToken)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Input))
         {
             return BadRequest("Input cannot be empty.");
         }
 
-        string response = await chatService.AskAgentAsync(request.Input);
+        string response = await chatService.AskAgentAsync(request.Input, cancellationToken);
 
         return Ok(response);
     }
