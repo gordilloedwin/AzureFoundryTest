@@ -1,0 +1,6 @@
+@AzureFoundryTest_HostAddress = http://localhost:5105
+
+GET {{AzureFoundryTest_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
