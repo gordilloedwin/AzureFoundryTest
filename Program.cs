@@ -15,11 +15,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-// --- Microsoft.Extensions.AI pipeline ---------------------------------------
-// The IChatClient registered here is the one ChatAoaiExtensionsService consumes.
-// The fluent .Use(...) call composes middleware around the inner Azure OpenAI client.
-// Swap in .UseOpenTelemetry() for the framework-provided equivalent of our
-// TracingChatClient (emits the full GenAI semantic-convention span set).
 builder.Services.AddChatClient(services =>
 {
     IConfiguration configuration = services.GetRequiredService<IConfiguration>();
@@ -36,13 +31,6 @@ builder.Services.AddChatClient(services =>
 
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiService>("aoai");
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiExtensionsService>("ext");
-
-// Subscribe an OTel tracer to the ActivitySources the app emits on,
-// and export to the console so you can see spans per request in the app log.
-// Note: ConsoleExporter writes to stdout. In Visual Studio, stdout goes to the
-// "ASP.NET Core Web Server" output window (via the Output window dropdown), NOT
-// the Debug window. For the Debug window, watch the ILogger lines emitted by
-// TracingChatClient and AgentController instead.
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
