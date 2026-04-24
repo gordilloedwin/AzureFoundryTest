@@ -5,15 +5,8 @@ namespace AzureFoundryTest.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AgentController : ControllerBase
+public class AgentController(IChatService chatService) : ControllerBase
 {
-    private readonly IChatService _chatService;
-
-    public AgentController(IChatService chatService)
-    {
-        _chatService = chatService;
-    }
-
     [HttpPost("ask-agent")]
     public async Task<ActionResult<string>> AskAgent([FromBody] AskAgentRequest request)
     {
@@ -22,7 +15,7 @@ public class AgentController : ControllerBase
             return BadRequest("Input cannot be empty.");
         }
 
-        string response = await _chatService.AskAgentAsync(request.Input);
+        string response = await chatService.AskAgentAsync(request.Input);
 
         return Ok(response);
     }
