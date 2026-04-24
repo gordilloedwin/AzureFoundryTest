@@ -2,6 +2,7 @@ using AzureFoundryTest.Swagger;
 using AzureFoundryTest.Services;
 using AzureFoundryTest.Services.Interfaces;
 using AzureFoundryTest.Middleware;
+using AzureFoundryTest.Controllers;
 using Azure.AI.OpenAI;
 using Azure.Identity;
 using Microsoft.Extensions.AI;
@@ -31,16 +32,22 @@ builder.Services.AddChatClient(services =>
         .GetChatClient(deployment)
         .AsIChatClient();
 })
-.Use(inner => new TracingChatClient(inner));
+.Use((inner, services) => ActivatorUtilities.CreateInstance<TracingChatClient>(services, inner));
 
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiService>("aoai");
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiExtensionsService>("ext");
 
-// Subscribe an OTel tracer to the ActivitySource the middleware emits on,
+// Subscribe an OTel tracer to the ActivitySources the app emits on,
 // and export to the console so you can see spans per request in the app log.
+// Note: ConsoleExporter writes to stdout. In Visual Studio, stdout goes to the
+// "ASP.NET Core Web Server" output window (via the Output window dropdown), NOT
+// the Debug window. For the Debug window, watch the ILogger lines emitted by
+// TracingChatClient and AgentController instead.
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
+        tracing.SetSampler(new AlwaysOnSampler());
+        tracing.AddSource(AgentController.ActivitySource.Name);
         tracing.AddSource(TracingChatClient.ActivitySource.Name);
         tracing.AddConsoleExporter();
     });

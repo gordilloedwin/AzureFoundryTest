@@ -7,8 +7,12 @@ public sealed class TracingChatClient : DelegatingChatClient
 {
 	public static readonly ActivitySource ActivitySource = new("AzureFoundryTest.Chat");
 
-	public TracingChatClient(IChatClient innerClient) : base(innerClient)
+	private readonly ILogger<TracingChatClient> _logger;
+
+	public TracingChatClient(IChatClient innerClient, ILogger<TracingChatClient> logger)
+		: base(innerClient)
 	{
+		_logger = logger;
 	}
 
 	public override async Task<ChatResponse> GetResponseAsync(
@@ -23,6 +27,10 @@ public sealed class TracingChatClient : DelegatingChatClient
 		activity?.SetTag("gen_ai.system", "azure.openai");
 		activity?.SetTag("gen_ai.request.model", options?.ModelId);
 
+		_logger.LogInformation(
+			"[chat middleware] outgoing request model={Model}",
+			options?.ModelId ?? "<default>");
+
 		try
 		{
 			ChatResponse response = await base.GetResponseAsync(messages, options, cancellationToken);
@@ -34,6 +42,14 @@ public sealed class TracingChatClient : DelegatingChatClient
 			activity?.SetTag("gen_ai.usage.output_tokens", response.Usage?.OutputTokenCount);
 			activity?.SetStatus(ActivityStatusCode.Ok);
 
+			_logger.LogInformation(
+				"[chat middleware] response id={ResponseId} model={Model} finish={Finish} tokens={Input}/{Output}",
+				response.ResponseId,
+				response.ModelId,
+				response.FinishReason?.ToString(),
+				response.Usage?.InputTokenCount,
+				response.Usage?.OutputTokenCount);
+
 			return response;
 		}
 		catch (Exception ex)
@@ -41,6 +57,9 @@ public sealed class TracingChatClient : DelegatingChatClient
 			activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
 			activity?.SetTag("exception.type", ex.GetType().FullName);
 			activity?.SetTag("exception.message", ex.Message);
+
+			_logger.LogError(ex, "[chat middleware] call failed");
+
 			throw;
 		}
 	}
