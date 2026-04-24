@@ -1,6 +1,4 @@
 using AzureFoundryTest.Services.Interfaces;
-using Azure.AI.OpenAI;
-using Azure.Identity;
 using Microsoft.Extensions.AI;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -9,8 +7,6 @@ namespace AzureFoundryTest.Services;
 
 public class ChatAoaiExtensionsService : IChatService
 {
-	private const string EndpointConfigKey = "AzureOpenAI:Endpoint";
-	private const string DeploymentConfigKey = "AzureOpenAI:DeploymentName";
 	private const string ResponseFilePath = "responses/ChatAoaiExtensionsService.json";
 
 	private static readonly JsonSerializerOptions PrettyJson = new()
@@ -22,16 +18,12 @@ public class ChatAoaiExtensionsService : IChatService
 
 	private readonly IChatClient _chatClient;
 
-	public ChatAoaiExtensionsService(IConfiguration configuration)
+	// IChatClient comes from the DI pipeline configured in Program.cs (AddChatClient + .Use(...)).
+	// The middleware stack (tracing, logging, caching, etc.) is transparent to this service —
+	// it just calls GetResponseAsync and the wrappers do their work around it.
+	public ChatAoaiExtensionsService(IChatClient chatClient)
 	{
-		string endpoint = configuration[EndpointConfigKey]
-			?? throw new InvalidOperationException($"Configuration value '{EndpointConfigKey}' is required.");
-
-		string deploymentName = configuration[DeploymentConfigKey]
-			?? throw new InvalidOperationException($"Configuration value '{DeploymentConfigKey}' is required.");
-
-		AzureOpenAIClient azureOpenAIClient = new(new Uri(endpoint), new DefaultAzureCredential());
-		_chatClient = azureOpenAIClient.GetChatClient(deploymentName).AsIChatClient();
+		_chatClient = chatClient;
 	}
 
 	public async Task<string> AskAgentAsync(string input, CancellationToken cancellationToken = default)
@@ -55,8 +47,6 @@ public class ChatAoaiExtensionsService : IChatService
 
 	private static async Task WriteResponseAsync(ChatResponse response, CancellationToken cancellationToken)
 	{
-		// ChatResponse is a plain POCO — System.Text.Json produces the M.E.AI-normalized shape directly.
-		// IgnoreCycles guards against RawRepresentation pointing back into inspectable object graphs.
 		string pretty = JsonSerializer.Serialize(response, PrettyJson);
 
 		Directory.CreateDirectory(Path.GetDirectoryName(ResponseFilePath)!);
