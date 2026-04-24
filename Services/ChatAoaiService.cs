@@ -5,14 +5,14 @@ using OpenAI.Chat;
 
 namespace AzureFoundryTest.Services;
 
-public class ChatService : IChatService
+public class ChatAoaiService : IChatService
 {
 	private const string EndpointConfigKey = "AzureOpenAI:Endpoint";
 	private const string DeploymentConfigKey = "AzureOpenAI:DeploymentName";
 
 	private readonly ChatClient _chatClient;
 
-	public ChatService(IConfiguration configuration)
+	public ChatAoaiService(IConfiguration configuration)
 	{
 		string endpoint = configuration[EndpointConfigKey]
 			?? throw new InvalidOperationException($"Configuration value '{EndpointConfigKey}' is required.");

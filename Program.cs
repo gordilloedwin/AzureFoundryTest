@@ -7,7 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddKeyedScoped<IChatService, ChatAoaiService>("aoai");
+builder.Services.AddKeyedScoped<IChatService, ChatAoaiExtensionsService>("ext");
 builder.Services.AddSwaggerGen(options =>
 {
     options.OperationFilter<AskAgentOperationFilter>();

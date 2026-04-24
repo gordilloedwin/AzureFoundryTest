@@ -8,12 +8,19 @@ public class AskAgentOperationFilter : IOperationFilter
 {
     public void Apply(OpenApiOperation operation, OperationFilterContext context)
     {
-        if (context.MethodInfo.Name != "AskAgent")
+        string? summary = context.MethodInfo.Name switch
+        {
+            "AskAgentAoai" => "Ask the agent via Azure.AI.OpenAI (native SDK).",
+            "AskAgentExt" => "Ask the agent via Microsoft.Extensions.AI (IChatClient abstraction).",
+            _ => null
+        };
+
+        if (summary is null)
         {
             return;
         }
 
-        operation.Summary = "Ask the agent a question.";
+        operation.Summary = summary;
         operation.Description = "Accepts a text prompt and returns a string response from the agent.";
 
         if (operation.RequestBody?.Content is not null &&
@@ -22,7 +29,7 @@ public class AskAgentOperationFilter : IOperationFilter
         {
             requestMediaType.Example = new JsonObject
             {
-                ["input"] = "What is the capital of France?"
+                ["input"] = "Summarize the benefits of async programming in C#."
             };
         }
 
@@ -32,7 +39,7 @@ public class AskAgentOperationFilter : IOperationFilter
         {
             foreach (var mediaType in okResponse.Content.Values)
             {
-                mediaType.Example = JsonValue.Create("Agent response: The capital of France is Paris.");
+                mediaType.Example = JsonValue.Create("Agent response: Async improves responsiveness and scalability.");
             }
         }
 
