@@ -1,6 +1,6 @@
 using AzureFoundryTest.Services.Interfaces;
 using Azure.AI.OpenAI;
-using Azure.Identity;
+using Azure.Core;
 using OpenAI.Chat;
 using System.ClientModel.Primitives;
 using System.Text.Json;
@@ -9,28 +9,40 @@ namespace AzureFoundryTest.Services;
 
 public class ChatAoaiService : IChatService
 {
-	private const string EndpointConfigKey = "AzureOpenAI:Endpoint";
 	private const string DeploymentConfigKey = "AzureOpenAI:DeploymentName";
 	private const string ResponseFilePath = "responses/ChatAoaiService.json";
 
 	private static readonly JsonSerializerOptions PrettyJson = new() { WriteIndented = true };
 
 	private readonly ChatClient _chatClient;
+	private readonly string _boundDeployment;
+	private readonly ILogger<ChatAoaiService> _logger;
 
-	public ChatAoaiService(IConfiguration configuration)
+	public ChatAoaiService(
+		IConfiguration configuration,
+		AzureOpenAIClient azureClient,
+		ILogger<ChatAoaiService> logger)
 	{
-		string endpoint = configuration[EndpointConfigKey]
-			?? throw new InvalidOperationException($"Configuration value '{EndpointConfigKey}' is required.");
-
-		string deploymentName = configuration[DeploymentConfigKey]
+		_boundDeployment = configuration[DeploymentConfigKey]
 			?? throw new InvalidOperationException($"Configuration value '{DeploymentConfigKey}' is required.");
 
-		AzureOpenAIClient azureOpenAIClient = new(new Uri(endpoint), new DefaultAzureCredential());
-		_chatClient = azureOpenAIClient.GetChatClient(deploymentName);
+		_chatClient = azureClient.GetChatClient(_boundDeployment);
+		_logger = logger;
 	}
 
-	public async Task<string> AskAgentAsync(string input, CancellationToken cancellationToken = default)
+	public async Task<string> AskAgentAsync(string input, string? deployment = null, CancellationToken cancellationToken = default)
 	{
+		// Native SDK path: the ChatClient is constructor-bound to one deployment. Honoring a
+		// per-call deployment parameter would require building our own client-cache factory here
+		// too — demonstrating the difference between "native SDK, static" and "M.E.AI, composable."
+		if (!string.IsNullOrWhiteSpace(deployment) &&
+			!deployment.Equals(_boundDeployment, StringComparison.OrdinalIgnoreCase))
+		{
+			_logger.LogWarning(
+				"[aoai service] per-call deployment '{Requested}' ignored — native path is bound to '{Bound}'",
+				deployment, _boundDeployment);
+		}
+
 		List<ChatMessage> messages =
 		[
 			new SystemChatMessage("You are a helpful assistant."),
@@ -50,8 +62,6 @@ public class ChatAoaiService : IChatService
 
 	private static async Task WriteResponseAsync(ChatCompletion completion, CancellationToken cancellationToken)
 	{
-		// ChatCompletion implements IJsonModel<T>, so ModelReaderWriter gives us the raw OpenAI-wire JSON
-		// (the same shape the REST API returned). Reparse + reserialize for pretty indentation.
 		BinaryData raw = ModelReaderWriter.Write(completion);
 		using JsonDocument doc = JsonDocument.Parse(raw);
 		string pretty = JsonSerializer.Serialize(doc.RootElement, PrettyJson);

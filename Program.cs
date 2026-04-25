@@ -4,33 +4,30 @@ using AzureFoundryTest.Services.Interfaces;
 using AzureFoundryTest.Middleware;
 using AzureFoundryTest.Controllers;
 using Azure.AI.OpenAI;
+using Azure.Core;
 using Azure.Identity;
-using Microsoft.Extensions.AI;
-using OpenTelemetry;
 using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-
-builder.Services.AddChatClient(services =>
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<TokenCredential>(_ => new DefaultAzureCredential());
+builder.Services.AddSingleton<AzureOpenAIClient>(sp =>
 {
-    IConfiguration configuration = services.GetRequiredService<IConfiguration>();
-    string endpoint = configuration["AzureOpenAI:Endpoint"]
+    IConfiguration config = sp.GetRequiredService<IConfiguration>();
+    TokenCredential credential = sp.GetRequiredService<TokenCredential>();
+    string endpoint = config["AzureOpenAI:Endpoint"]
         ?? throw new InvalidOperationException("Configuration value 'AzureOpenAI:Endpoint' is required.");
-    string deployment = configuration["AzureOpenAI:DeploymentName"]
-        ?? throw new InvalidOperationException("Configuration value 'AzureOpenAI:DeploymentName' is required.");
+    return new AzureOpenAIClient(new Uri(endpoint), credential);
+});
 
-    return new AzureOpenAIClient(new Uri(endpoint), new DefaultAzureCredential())
-        .GetChatClient(deployment)
-        .AsIChatClient();
-})
-.Use((inner, services) => ActivatorUtilities.CreateInstance<TracingChatClient>(services, inner));
-
+builder.Services.AddSingleton<IDeploymentCatalog, AzureDeploymentCatalog>();
+builder.Services.AddSingleton<IChatClientFactory, ChatClientFactory>();
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiService>("aoai");
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiExtensionsService>("ext");
+
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {

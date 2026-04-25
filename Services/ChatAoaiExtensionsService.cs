@@ -16,25 +16,26 @@ public class ChatAoaiExtensionsService : IChatService
 		DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
 	};
 
-	private readonly IChatClient _chatClient;
+	private readonly IChatClientFactory _clientFactory;
 
-	// IChatClient comes from the DI pipeline configured in Program.cs (AddChatClient + .Use(...)).
-	// The middleware stack (tracing, logging, caching, etc.) is transparent to this service —
-	// it just calls GetResponseAsync and the wrappers do their work around it.
-	public ChatAoaiExtensionsService(IChatClient chatClient)
+	// The factory hands back a cached-per-deployment IChatClient already wrapped
+	// with the middleware pipeline configured in Program.cs.
+	public ChatAoaiExtensionsService(IChatClientFactory clientFactory)
 	{
-		_chatClient = chatClient;
+		_clientFactory = clientFactory;
 	}
 
-	public async Task<string> AskAgentAsync(string input, CancellationToken cancellationToken = default)
+	public async Task<string> AskAgentAsync(string input, string? deployment = null, CancellationToken cancellationToken = default)
 	{
+		IChatClient chatClient = await _clientFactory.GetAsync(deployment, cancellationToken);
+
 		List<ChatMessage> messages =
 		[
 			new ChatMessage(ChatRole.System, "You are a helpful assistant."),
 			new ChatMessage(ChatRole.User, input)
 		];
 
-		ChatResponse response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+		ChatResponse response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
 
 		await WriteResponseAsync(response, cancellationToken);
 

@@ -12,6 +12,7 @@ public class AskAgentOperationFilter : IOperationFilter
         {
             "AskAgentAoai" => "Ask the agent via Azure.AI.OpenAI (native SDK).",
             "AskAgentExt" => "Ask the agent via Microsoft.Extensions.AI (IChatClient abstraction).",
+            "GetModels" => "List deployments available to the running identity (live from Azure with config fallback).",
             _ => null
         };
 
@@ -21,7 +22,16 @@ public class AskAgentOperationFilter : IOperationFilter
         }
 
         operation.Summary = summary;
-        operation.Description = "Accepts a text prompt and returns a string response from the agent.";
+
+        if (context.MethodInfo.Name == "GetModels")
+        {
+            operation.Description = "Hit this first to discover which `model` values are accepted by the ask-agent-* endpoints.";
+            return;
+        }
+
+        operation.Description = "Accepts a text prompt and returns a string response from the agent. " +
+            "`model` is optional; when omitted, the service uses its configured default deployment. " +
+            "Note: the native AOAI endpoint ignores `model` and only honors the startup-bound deployment.";
 
         if (operation.RequestBody?.Content is not null &&
             operation.RequestBody.Content.TryGetValue("application/json", out OpenApiMediaType? requestMediaType) &&
@@ -29,7 +39,8 @@ public class AskAgentOperationFilter : IOperationFilter
         {
             requestMediaType.Example = new JsonObject
             {
-                ["input"] = "Summarize the benefits of async programming in C#."
+                ["input"] = "Summarize the benefits of async programming in C#.",
+                ["model"] = "gpt-4o"
             };
         }
 

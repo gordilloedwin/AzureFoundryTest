@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using AzureFoundryTest.Services.Interfaces;
 using System.Diagnostics;
 
@@ -11,6 +10,15 @@ public class AgentController(ILogger<AgentController> logger) : ControllerBase
 {
     public static readonly ActivitySource ActivitySource = new("AzureFoundryTest.Agent");
 
+    [HttpGet("models")]
+    public async Task<ActionResult<IReadOnlyList<DeploymentInfo>>> GetModels(
+        [FromServices] IDeploymentCatalog catalog,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<DeploymentInfo> deployments = await catalog.ListAsync(cancellationToken);
+        return Ok(deployments);
+    }
+
     [HttpPost("ask-agent-aoai")]
     public async Task<ActionResult<string>> AskAgentAoai(
         [FromKeyedServices("aoai")] IChatService chatService,
@@ -19,7 +27,8 @@ public class AgentController(ILogger<AgentController> logger) : ControllerBase
     {
         using Activity? activity = ActivitySource.StartActivity("ask-agent.aoai", ActivityKind.Server);
         activity?.SetTag("agent.sdk", "Azure.AI.OpenAI (native)");
-        logger.LogInformation("[controller] ask-agent.aoai invoked — SDK=Azure.AI.OpenAI (native, no middleware pipeline)");
+        activity?.SetTag("agent.requested_model", request?.Model);
+        logger.LogInformation("[controller] ask-agent.aoai invoked — SDK=Azure.AI.OpenAI (native), requested model={Model}", request?.Model ?? "<default>");
 
         return await HandleAsync(chatService, request, cancellationToken);
     }
@@ -32,14 +41,15 @@ public class AgentController(ILogger<AgentController> logger) : ControllerBase
     {
         using Activity? activity = ActivitySource.StartActivity("ask-agent.ext", ActivityKind.Server);
         activity?.SetTag("agent.sdk", "Microsoft.Extensions.AI");
-        logger.LogInformation("[controller] ask-agent.ext invoked — SDK=Microsoft.Extensions.AI (TracingChatClient middleware will emit a child span)");
+        activity?.SetTag("agent.requested_model", request?.Model);
+        logger.LogInformation("[controller] ask-agent.ext invoked — SDK=Microsoft.Extensions.AI, requested model={Model}", request?.Model ?? "<default>");
 
         return await HandleAsync(chatService, request, cancellationToken);
     }
 
     private async Task<ActionResult<string>> HandleAsync(
         IChatService chatService,
-        AskAgentRequest request,
+        AskAgentRequest? request,
         CancellationToken cancellationToken)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Input))
@@ -47,13 +57,23 @@ public class AgentController(ILogger<AgentController> logger) : ControllerBase
             return BadRequest("Input cannot be empty.");
         }
 
-        string response = await chatService.AskAgentAsync(request.Input, cancellationToken);
-
-        return Ok(response);
+        try
+        {
+            string response = await chatService.AskAgentAsync(request.Input, request.Model, cancellationToken);
+            return Ok(response);
+        }
+        catch (ArgumentException ex) when (ex.ParamName == "deployment")
+        {
+            return BadRequest(ex.Message);
+        }
     }
 }
 
 public class AskAgentRequest
 {
     public string Input { get; set; } = string.Empty;
+
+    // Optional — when null or empty, the service uses its configured default deployment.
+    // Hit GET /api/agent/models to see which deployment names are accepted.
+    public string? Model { get; set; }
 }
