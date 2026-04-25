@@ -45,10 +45,20 @@ public sealed class ChatClientFactory : IChatClientFactory
 
 		// Lazy-build + cache per deployment. Each cached client carries its own middleware pipeline,
 		// so tracing/logging wrapping happens once per deployment and is reused across calls.
+		//
+		// Pipeline order (outermost first): UseOpenTelemetry → TracingChatClient → inner Azure client.
+		// .UseOpenTelemetry() emits the OTel GenAI semantic-convention spans + metrics
+		// (gen_ai.client.operation.duration, gen_ai.client.token.usage). Default source/meter name is
+		// "Experimental.Microsoft.Extensions.AI" — both must be subscribed to in Program.cs.
+		// EnableSensitiveData stays at its default (false): no prompt/completion content captured,
+		// which keeps central observability data-sovereignty-compliant.
 		return _cache.GetOrAdd(target, name =>
 		{
 			IChatClient inner = _azureClient.GetChatClient(name).AsIChatClient();
-			return ActivatorUtilities.CreateInstance<TracingChatClient>(_services, inner);
+			return new ChatClientBuilder(inner)
+				.UseOpenTelemetry(loggerFactory: _services.GetRequiredService<ILoggerFactory>())
+				.Use(c => ActivatorUtilities.CreateInstance<TracingChatClient>(_services, c))
+				.Build();
 		});
 	}
 }
