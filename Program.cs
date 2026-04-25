@@ -3,6 +3,7 @@ using AzureFoundryTest.Services;
 using AzureFoundryTest.Services.Interfaces;
 using AzureFoundryTest.Middleware;
 using AzureFoundryTest.Controllers;
+using AzureFoundryTest.Diagnostics;
 using Azure.AI.OpenAI;
 using Azure.Core;
 using Azure.Identity;
@@ -55,6 +56,11 @@ builder.Services.AddOpenTelemetry()
         // gen_ai.client.operation.duration (histogram by model), gen_ai.client.token.usage
         // (histogram by direction=input|output). Same emitter, same conventions, no custom code.
         metrics.AddMeter("Experimental.Microsoft.Extensions.AI");
+
+        // Layer 3 — App-specific metrics. See Diagnostics/AppMetrics.cs.
+        // agent.catalog.refresh{source}, agent.catalog.lookup{result}, agent.finish_reason{reason},
+        // agent.client_factory.size (gauge).
+        metrics.AddMeter(AppMetrics.MeterName);
 
         // Console export every 10s — keeps the demo console readable instead of flooding it.
         metrics.AddConsoleExporter((_, readerOptions) =>

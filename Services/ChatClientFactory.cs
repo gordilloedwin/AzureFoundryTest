@@ -1,3 +1,4 @@
+using AzureFoundryTest.Diagnostics;
 using AzureFoundryTest.Middleware;
 using AzureFoundryTest.Services.Interfaces;
 using Azure.AI.OpenAI;
@@ -27,6 +28,12 @@ public sealed class ChatClientFactory : IChatClientFactory
 		_azureClient = azureClient;
 		_catalog = catalog;
 		_services = services;
+
+		// Observable gauge — read on each metric export. No allocation per chat call.
+		AppMetrics.Meter.CreateObservableGauge<int>(
+			"agent.client_factory.size",
+			() => _cache.Count,
+			description: "Number of cached per-deployment IChatClient instances currently held by the factory.");
 	}
 
 	public async Task<IChatClient> GetAsync(string? deployment, CancellationToken cancellationToken = default)

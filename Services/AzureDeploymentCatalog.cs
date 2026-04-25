@@ -1,3 +1,4 @@
+using AzureFoundryTest.Diagnostics;
 using AzureFoundryTest.Services.Interfaces;
 using Azure.Core;
 using System.Net.Http.Headers;
@@ -87,6 +88,7 @@ public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 	{
 		if (_cached is not null && DateTimeOffset.UtcNow - _cachedAt < CacheTtl)
 		{
+			AppMetrics.CatalogLookup.Add(1, new KeyValuePair<string, object?>("result", "hit"));
 			return _cached;
 		}
 
@@ -95,14 +97,18 @@ public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 		{
 			if (_cached is not null && DateTimeOffset.UtcNow - _cachedAt < CacheTtl)
 			{
+				// Another thread refreshed while we waited — value of double-checked locking, made measurable.
+				AppMetrics.CatalogLookup.Add(1, new KeyValuePair<string, object?>("result", "coalesced"));
 				return _cached;
 			}
 
 			IReadOnlyList<DeploymentInfo>? fromAzure = await TryFetchFromAzureAsync(cancellationToken);
+			string source;
 			if (fromAzure is { Count: > 0 })
 			{
 				_logger.LogInformation("[deployment catalog] loaded {Count} deployment(s) from Azure ARM", fromAzure.Count);
 				_cached = fromAzure;
+				source = "azure";
 			}
 			else
 			{
@@ -112,9 +118,12 @@ public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 					"'Microsoft.CognitiveServices/accounts/deployments/read' (e.g. Cognitive Services User, Reader, or Contributor).",
 					_configuredFallback.Count);
 				_cached = _configuredFallback;
+				source = "config";
 			}
 
 			_cachedAt = DateTimeOffset.UtcNow;
+			AppMetrics.CatalogLookup.Add(1, new KeyValuePair<string, object?>("result", "refreshed"));
+			AppMetrics.CatalogRefresh.Add(1, new KeyValuePair<string, object?>("source", source));
 			return _cached;
 		}
 		finally

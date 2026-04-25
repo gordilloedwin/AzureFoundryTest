@@ -1,3 +1,4 @@
+using AzureFoundryTest.Diagnostics;
 using Microsoft.Extensions.AI;
 using System.Diagnostics;
 
@@ -35,9 +36,12 @@ public sealed class TracingChatClient : DelegatingChatClient
 		{
 			ChatResponse response = await base.GetResponseAsync(messages, options, cancellationToken);
 
+			string finishReason = response.FinishReason?.ToString() ?? "unknown";
+			AppMetrics.FinishReason.Add(1, new KeyValuePair<string, object?>("reason", finishReason));
+
 			activity?.SetTag("gen_ai.response.id", response.ResponseId);
 			activity?.SetTag("gen_ai.response.model", response.ModelId);
-			activity?.SetTag("gen_ai.response.finish_reason", response.FinishReason?.ToString());
+			activity?.SetTag("gen_ai.response.finish_reason", finishReason);
 			activity?.SetTag("gen_ai.usage.input_tokens", response.Usage?.InputTokenCount);
 			activity?.SetTag("gen_ai.usage.output_tokens", response.Usage?.OutputTokenCount);
 			activity?.SetStatus(ActivityStatusCode.Ok);
