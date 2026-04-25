@@ -3,7 +3,9 @@
     "allow": [
       "Bash(dotnet add *)",
       "Bash(dotnet build *)",
-      "Bash(dotnet list *)"
+      "Bash(dotnet list *)",
+      "mcp__claude_ai_Microsoft_Learn__microsoft_docs_search",
+      "Bash(dotnet user-secrets *)"
     ]
   }
 }

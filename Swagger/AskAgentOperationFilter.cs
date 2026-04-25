@@ -39,7 +39,7 @@ public class AskAgentOperationFilter : IOperationFilter
         {
             requestMediaType.Example = new JsonObject
             {
-                ["input"] = "Summarize the benefits of async programming in C#.",
+                ["input"] = "What is the capital of Mexico?",
                 ["model"] = "gpt-4o"
             };
         }
@@ -50,7 +50,7 @@ public class AskAgentOperationFilter : IOperationFilter
         {
             foreach (var mediaType in okResponse.Content.Values)
             {
-                mediaType.Example = JsonValue.Create("Agent response: Async improves responsiveness and scalability.");
+                mediaType.Example = JsonValue.Create("Agent response: The capital of Mexico is Mexico City.");
             }
         }
 
