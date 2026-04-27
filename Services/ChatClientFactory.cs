@@ -9,6 +9,7 @@ namespace AzureFoundryTest.Services;
 
 public sealed class ChatClientFactory : IChatClientFactory
 {
+	
 	private readonly AzureOpenAIClient _azureClient;
 	private readonly IDeploymentCatalog _catalog;
 	private readonly IServiceProvider _services;
