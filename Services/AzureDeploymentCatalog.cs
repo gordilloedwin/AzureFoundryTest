@@ -1,22 +1,20 @@
 using AzureFoundryTest.Diagnostics;
 using AzureFoundryTest.Services.Interfaces;
 using Azure.Core;
-using System.Net.Http.Headers;
-using System.Text.Json;
+using Azure.ResourceManager;
+using Azure.ResourceManager.CognitiveServices;
 
 namespace AzureFoundryTest.Services;
 
 public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 {
-	// ARM (control plane) is the correct surface for listing deployments.
-	// Data plane has no list-deployments endpoint in GA, hence the earlier 404.
-	private const string ManagementScope = "https://management.azure.com/.default";
-	private const string DeploymentsApiVersion = "2024-10-01";
 	private static readonly TimeSpan CacheTtl = TimeSpan.FromMinutes(5);
 
-	private readonly Uri? _armListUrl;
+	private readonly string? _subscriptionId;
+	private readonly string? _resourceGroup;
+	private readonly string? _accountName;
+	private readonly bool _armConfigured;
 	private readonly TokenCredential _credential;
-	private readonly HttpClient _http;
 	private readonly IReadOnlyList<DeploymentInfo> _configuredFallback;
 	private readonly ILogger<AzureDeploymentCatalog> _logger;
 	private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -27,44 +25,40 @@ public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 	public AzureDeploymentCatalog(
 		IConfiguration configuration,
 		TokenCredential credential,
-		IHttpClientFactory httpFactory,
 		ILogger<AzureDeploymentCatalog> logger)
 	{
 		_credential = credential;
-		_http = httpFactory.CreateClient(nameof(AzureDeploymentCatalog));
 		_logger = logger;
 
-		string? subscriptionId = configuration["AzureOpenAI:SubscriptionId"];
-		string? resourceGroup = configuration["AzureOpenAI:ResourceGroup"];
-		string? accountName = configuration["AzureOpenAI:AccountName"];
-		if (string.IsNullOrWhiteSpace(accountName))
+		_subscriptionId = configuration["AzureOpenAI:SubscriptionId"];
+		_resourceGroup = configuration["AzureOpenAI:ResourceGroup"];
+		_accountName = configuration["AzureOpenAI:AccountName"];
+		if (string.IsNullOrWhiteSpace(_accountName))
 		{
 			// ?? won't fall through on "", only on null. appsettings.json ships with "" placeholders,
 			// so explicitly treat whitespace/empty as "not set" before attempting derivation.
-			accountName = DeriveAccountFromEndpoint(configuration["AzureOpenAI:Endpoint"]);
+			_accountName = DeriveAccountFromEndpoint(configuration["AzureOpenAI:Endpoint"]);
 		}
 
-		if (!string.IsNullOrWhiteSpace(subscriptionId) &&
-			!string.IsNullOrWhiteSpace(resourceGroup) &&
-			!string.IsNullOrWhiteSpace(accountName))
+		_armConfigured =
+			!string.IsNullOrWhiteSpace(_subscriptionId) &&
+			!string.IsNullOrWhiteSpace(_resourceGroup) &&
+			!string.IsNullOrWhiteSpace(_accountName);
+
+		if (_armConfigured)
 		{
-			_armListUrl = new Uri(
-				$"https://management.azure.com/subscriptions/{subscriptionId}" +
-				$"/resourceGroups/{resourceGroup}" +
-				$"/providers/Microsoft.CognitiveServices/accounts/{accountName}" +
-				$"/deployments?api-version={DeploymentsApiVersion}");
 			logger.LogInformation(
-				"[deployment catalog] ARM list URL configured for account '{Account}' in RG '{ResourceGroup}'",
-				accountName, resourceGroup);
+				"[deployment catalog] ARM SDK configured for account '{Account}' in RG '{ResourceGroup}'",
+				_accountName, _resourceGroup);
 		}
 		else
 		{
 			List<string> missing = new();
-			if (string.IsNullOrWhiteSpace(subscriptionId)) missing.Add("SubscriptionId");
-			if (string.IsNullOrWhiteSpace(resourceGroup)) missing.Add("ResourceGroup");
-			if (string.IsNullOrWhiteSpace(accountName)) missing.Add("AccountName (or derivable Endpoint)");
+			if (string.IsNullOrWhiteSpace(_subscriptionId)) missing.Add("SubscriptionId");
+			if (string.IsNullOrWhiteSpace(_resourceGroup)) missing.Add("ResourceGroup");
+			if (string.IsNullOrWhiteSpace(_accountName)) missing.Add("AccountName (or derivable Endpoint)");
 			logger.LogWarning(
-				"[deployment catalog] ARM list URL NOT configured — missing: {Missing}. Live discovery disabled; falling back to config allowlist.",
+				"[deployment catalog] ARM SDK NOT configured — missing: {Missing}. Live discovery disabled; falling back to config allowlist.",
 				string.Join(", ", missing));
 		}
 
@@ -134,7 +128,7 @@ public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 
 	private async Task<IReadOnlyList<DeploymentInfo>?> TryFetchFromAzureAsync(CancellationToken cancellationToken)
 	{
-		if (_armListUrl is null)
+		if (!_armConfigured)
 		{
 			_logger.LogInformation(
 				"[deployment catalog] ARM config incomplete — skipping live listing. " +
@@ -144,56 +138,23 @@ public sealed class AzureDeploymentCatalog : IDeploymentCatalog
 
 		try
 		{
-			AccessToken token = await _credential.GetTokenAsync(
-				new TokenRequestContext(new[] { ManagementScope }),
-				cancellationToken);
-
-			using HttpRequestMessage request = new(HttpMethod.Get, _armListUrl);
-			request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Token);
-
-			using HttpResponseMessage response = await _http.SendAsync(request, cancellationToken);
-			if (!response.IsSuccessStatusCode)
-			{
-				string body = await response.Content.ReadAsStringAsync(cancellationToken);
-				_logger.LogWarning(
-					"[deployment catalog] GET {Url} returned {Status}. Body: {Body}",
-					_armListUrl, (int)response.StatusCode, body);
-				return null;
-			}
-
-			await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-			using JsonDocument doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-
-			// ARM list shape: { "value": [ { "name": "...", "properties": { "model": { "name": "..." }, "provisioningState": "..." } } ] }
-			if (!doc.RootElement.TryGetProperty("value", out JsonElement valueEl) || valueEl.ValueKind != JsonValueKind.Array)
-			{
-				return null;
-			}
+			var armClient = new ArmClient(_credential);
+			var accountId = CognitiveServicesAccountResource.CreateResourceIdentifier(
+				_subscriptionId!, _resourceGroup!, _accountName!);
+			var account = armClient.GetCognitiveServicesAccountResource(accountId);
+			var deploymentCollection = account.GetCognitiveServicesAccountDeployments();
 
 			List<DeploymentInfo> results = new();
-			foreach (JsonElement item in valueEl.EnumerateArray())
+			await foreach (var deployment in deploymentCollection.GetAllAsync(cancellationToken: cancellationToken))
 			{
-				string? name = item.TryGetProperty("name", out JsonElement nameEl) ? nameEl.GetString() : null;
+				string? name = deployment.Data.Name;
 				if (string.IsNullOrWhiteSpace(name))
 				{
 					continue;
 				}
 
-				string? model = null;
-				string? status = null;
-				if (item.TryGetProperty("properties", out JsonElement propsEl))
-				{
-					if (propsEl.TryGetProperty("model", out JsonElement modelEl) &&
-						modelEl.TryGetProperty("name", out JsonElement modelNameEl))
-					{
-						model = modelNameEl.GetString();
-					}
-					if (propsEl.TryGetProperty("provisioningState", out JsonElement stateEl))
-					{
-						status = stateEl.GetString();
-					}
-				}
-
+				string? model = deployment.Data.Properties?.Model?.Name;
+				string? status = deployment.Data.Properties?.ProvisioningState?.ToString();
 				results.Add(new DeploymentInfo(name, model, status, "azure"));
 			}
 
