@@ -1,3 +1,5 @@
+using AzureFoundryTest.Mapping;
+using AzureFoundryTest.Models.Chat;
 using AzureFoundryTest.Services.Interfaces;
 using Microsoft.Extensions.AI;
 using System.Text.Json;
@@ -35,7 +37,9 @@ public class ChatAoaiExtensionsService : IChatService
 			new ChatMessage(ChatRole.User, input)
 		];
 
-		ChatResponse response = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+		ChatResponse raw = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+
+		AgentChatResponse response = raw.ToAgent(deployment);
 
 		await WriteResponseAsync(response, cancellationToken);
 
@@ -46,7 +50,7 @@ public class ChatAoaiExtensionsService : IChatService
 			: modelResponse;
 	}
 
-	private static async Task WriteResponseAsync(ChatResponse response, CancellationToken cancellationToken)
+	private static async Task WriteResponseAsync(AgentChatResponse response, CancellationToken cancellationToken)
 	{
 		string pretty = JsonSerializer.Serialize(response, PrettyJson);
 
