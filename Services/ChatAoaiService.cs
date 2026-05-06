@@ -51,6 +51,7 @@ public class ChatAoaiService : IChatService
 
 		var response = await _chatClient.CompleteChatAsync(messages, cancellationToken: cancellationToken);
 
+
 		await WriteResponseAsync(response.Value, cancellationToken);
 
 		string modelResponse = string.Concat(response.Value.Content.Select(part => part.Text));

@@ -5,6 +5,7 @@ using AzureFoundryTest.Middleware;
 using AzureFoundryTest.Controllers;
 using AzureFoundryTest.Diagnostics;
 using Azure.AI.OpenAI;
+using Azure.AI.TextAnalytics;
 using Azure.Core;
 using Azure.Identity;
 using OpenTelemetry.Metrics;
@@ -30,6 +31,16 @@ builder.Services.AddSingleton<IDeploymentCatalog, AzureDeploymentCatalog>();
 builder.Services.AddSingleton<IChatClientFactory, ChatClientFactory>();
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiService>("aoai");
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiExtensionsService>("ext");
+
+builder.Services.AddSingleton<TextAnalyticsClient>(sp =>
+{
+    IConfiguration config = sp.GetRequiredService<IConfiguration>();
+    TokenCredential credential = sp.GetRequiredService<TokenCredential>();
+    string endpoint = config["AzureLanguage:Endpoint"]
+        ?? throw new InvalidOperationException("Configuration value 'AzureLanguage:Endpoint' is required.");
+    return new TextAnalyticsClient(new Uri(endpoint), credential);
+});
+builder.Services.AddScoped<ISentimentService, SentimentService>();
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>

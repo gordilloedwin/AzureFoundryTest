@@ -39,6 +39,8 @@ public class ChatAoaiExtensionsService : IChatService
 
 		ChatResponse raw = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
 
+		//var x = chatClient
+
 		AgentChatResponse response = raw.ToAgent(deployment);
 
 		await WriteResponseAsync(response, cancellationToken);

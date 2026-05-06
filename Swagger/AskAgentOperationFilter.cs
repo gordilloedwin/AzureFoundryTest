@@ -13,6 +13,7 @@ public class AskAgentOperationFilter : IOperationFilter
             "AskAgentAoai" => "Ask the agent via Azure.AI.OpenAI (native SDK).",
             "AskAgentExt" => "Ask the agent via Microsoft.Extensions.AI (IChatClient abstraction).",
             "GetModels" => "List deployments available to the running identity (live from Azure with config fallback).",
+            "AnalyzeSentiment" => "Analyze the sentiment of a text using Azure AI Language.",
             _ => null
         };
 
@@ -26,6 +27,24 @@ public class AskAgentOperationFilter : IOperationFilter
         if (context.MethodInfo.Name == "GetModels")
         {
             operation.Description = "Hit this first to discover which `model` values are accepted by the ask-agent-* endpoints.";
+            return;
+        }
+
+        if (context.MethodInfo.Name == "AnalyzeSentiment")
+        {
+            operation.Description = "Submits text to Azure AI Language and returns the detected sentiment " +
+                "(Positive, Negative, Neutral, or Mixed) with confidence scores for each category.";
+
+            if (operation.RequestBody?.Content is not null &&
+                operation.RequestBody.Content.TryGetValue("application/json", out OpenApiMediaType? sentimentRequestMediaType) &&
+                sentimentRequestMediaType is not null)
+            {
+                sentimentRequestMediaType.Example = new JsonObject
+                {
+                    ["text"] = "I absolutely loved the new product — it exceeded all my expectations!"
+                };
+            }
+
             return;
         }
 
