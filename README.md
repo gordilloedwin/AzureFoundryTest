@@ -14,7 +14,7 @@ The codebase is intentionally kept small and focused so you can easily add servi
 |---|---|---|---|
 | **ChatAoaiService** | `AgentController` | Native Azure OpenAI SDK | Direct AOAI API patterns, response shapes |
 | **ChatAoaiExtensionsService** | `AgentController` | M.E.AI abstraction layer | Vendor-neutral AI abstractions, middleware composition |
-| **SentimentService** | `SentimentController` | Text sentiment analysis | (Add sentiment analysis service) |
+| **SentimentService** | `SentimentController` | Dual-provider sentiment analysis | Compare deterministic NLP vs LLM classification |
 | **AzureDeploymentCatalog** | `AgentController` (`/api/agent/models`) | Live ARM discovery + fallback | Azure Resource Manager integration, identity & RBAC |
 
 ## What This Demonstrates
@@ -66,7 +66,7 @@ Swagger UI is at `/swagger` in Development.
 | `/api/agent/models` | GET | List Azure OpenAI deployments via ARM discovery | ARM SDK, identity, RBAC |
 | `/api/agent/ask-agent-aoai` | POST | Query deployment using native `Azure.AI.OpenAI` SDK | Native AOAI SDK patterns |
 | `/api/agent/ask-agent-ext` | POST | Query deployment using `Microsoft.Extensions.AI` abstraction | Vendor-neutral abstractions, middleware |
-| `/api/sentiment/analyze` | POST | Analyze text sentiment (TBD: add service) | Text analysis patterns |
+| `/api/sentiment/analyze` | POST | Analyze sentiment with both Azure AI Language and Azure OpenAI | NLP + LLM comparison patterns |
 
 ### Request format for chat endpoints:
 
@@ -79,18 +79,29 @@ Swagger UI is at `/swagger` in Development.
 
 `model` is optional — omit it to use the configured default. The native AOAI endpoint logs and ignores `model` (intentional — highlights the abstraction difference).
 
+### Request format for sentiment endpoint:
+
+```json
+{
+  "text": "I love the speed, but setup was frustrating.",
+  "model": "gpt-4o"
+}
+```
+
+`model` is optional and only affects the Azure OpenAI sentiment path. If omitted, `AzureOpenAI:DeploymentName` is used.
+
 ## Project Structure
 
 ```
 Controllers/
   ├── AgentController.cs         # Azure OpenAI chat endpoints
-  └── SentimentController.cs     # Sentiment analysis (TBD)
+  └── SentimentController.cs     # Sentiment endpoint (Azure Language + Azure OpenAI)
 
 Services/
   ├── ChatAoaiService.cs         # Native Azure.AI.OpenAI SDK wrapper
   ├── ChatAoaiExtensionsService.cs  # M.E.AI abstraction wrapper
   ├── ChatClientFactory.cs       # DI factory for chat clients
-  ├── SentimentService.cs        # Sentiment analysis (TBD)
+  ├── SentimentService.cs        # Dual-provider sentiment analysis service
   ├── AzureDeploymentCatalog.cs  # ARM discovery + fallback logic
   └── Interfaces/                # Service contracts
 
@@ -165,7 +176,7 @@ As you continue learning for AI-102, consider adding these patterns:
 - [ ] **Streaming responses** — Implement server-sent events (SSE) for streaming chat completions
 - [ ] **Prompt engineering** — Add system prompts, temperature control, token budgeting
 - [ ] **Function calling** — Demonstrate structured tool use and multi-turn conversations
-- [ ] **Sentiment analysis completion** — Finish the `SentimentService` (could use Azure OpenAI, Text Analytics, or both)
+- [x] **Sentiment analysis completion** — `SentimentService` now uses Azure OpenAI and Azure AI Language side-by-side
 - [ ] **Deployment** — Containerize and deploy to Azure Container Apps or AKS
 - [ ] **Content filtering** — Explore Azure OpenAI's content filtering and safety layers
 - [ ] **Monitoring & alerts** — Hook up to Azure Monitor, Application Insights, or Datadog

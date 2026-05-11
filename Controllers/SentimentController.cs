@@ -21,7 +21,7 @@ public class SentimentController(ILogger<SentimentController> logger) : Controll
 
         logger.LogInformation("[controller] sentiment analysis invoked for text of length {Length}", request.Text.Length);
 
-        SentimentResult result = await sentimentService.AnalyzeAsync(request.Text, cancellationToken);
+        SentimentResult result = await sentimentService.AnalyzeAsync(request.Text, request.Model, cancellationToken);
         return Ok(result);
     }
 }
@@ -29,4 +29,7 @@ public class SentimentController(ILogger<SentimentController> logger) : Controll
 public class SentimentRequest
 {
     public string Text { get; set; } = string.Empty;
+
+    // Optional Azure OpenAI deployment override for the AOAI sentiment path.
+    public string? Model { get; set; }
 }

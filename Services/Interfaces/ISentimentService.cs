@@ -4,5 +4,5 @@ namespace AzureFoundryTest.Services.Interfaces;
 
 public interface ISentimentService
 {
-    Task<SentimentResult> AnalyzeAsync(string text, CancellationToken cancellationToken = default);
+    Task<SentimentResult> AnalyzeAsync(string text, string? deployment = null, CancellationToken cancellationToken = default);
 }
