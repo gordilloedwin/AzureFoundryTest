@@ -1,16 +1,33 @@
 # AzureFoundryTest
 
-ASP.NET Core Web API that compares two SDKs for calling the same Azure OpenAI deployment side-by-side: the native `Azure.AI.OpenAI` SDK and the vendor-neutral `Microsoft.Extensions.AI` abstraction. It is research scaffolding — small on purpose, built to produce runnable evidence (response JSON dumps, OpenTelemetry traces and metrics, Swagger UI) that informs architectural choices in other projects.
+**A hands-on learning platform for AI-102 certification and Azure AI services exploration.**
 
-## What it demonstrates
+This ASP.NET Core Web API serves two purposes:
+1. **Learning platform** — Testing ground for Azure AI concepts while preparing for AI-102
+2. **SDK research lab** — Comparing the native `Azure.AI.OpenAI` SDK against the vendor-neutral `Microsoft.Extensions.AI` abstraction side-by-side
+
+The codebase is intentionally kept small and focused so you can easily add services, test new patterns, and trace how everything connects. When you open this project, use this README to remember what you're currently testing and what concepts are in focus.
+
+## Current Services & Controllers
+
+| Service | Controller | Purpose | Learning Focus |
+|---|---|---|---|
+| **ChatAoaiService** | `AgentController` | Native Azure OpenAI SDK | Direct AOAI API patterns, response shapes |
+| **ChatAoaiExtensionsService** | `AgentController` | M.E.AI abstraction layer | Vendor-neutral AI abstractions, middleware composition |
+| **SentimentService** | `SentimentController` | Text sentiment analysis | (Add sentiment analysis service) |
+| **AzureDeploymentCatalog** | `AgentController` (`/api/agent/models`) | Live ARM discovery + fallback | Azure Resource Manager integration, identity & RBAC |
+
+## What This Demonstrates
 
 - **SDK shape comparison.** Two endpoints hit the same deployment through different SDKs; each writes the raw SDK response object to a JSON file so the abstractions can be diffed line-by-line.
-- **Middleware composition (M.E.AI only).** A custom `DelegatingChatClient` (tracing/logging) plus the framework's built-in `.UseOpenTelemetry()` layered on the same per-deployment client via DI. Demonstrates the kind of cross-cutting wiring that has no equivalent in the native AOAI SDK.
-- **Runtime model selection.** `IChatClientFactory` returns a cached-per-deployment `IChatClient` validated against an allowlist sourced from a live ARM deployment listing (with config-driven fallback). The native AOAI service deliberately doesn't get this capability — the gap is the point.
-- **Operational telemetry, three layers.** Framework instrumentation (ASP.NET Core, HttpClient, .NET runtime), M.E.AI's GenAI semantic-convention metrics, and a small app-specific meter for catalog/cache/quality signals — all dimensions bounded categorical, no tenant or user identifiers.
-- **Data-sovereignty discipline encoded in code.** No `EnableSensitiveData`, no per-tenant labels on central metrics, no secrets in committed config.
+- **Middleware composition (M.E.AI only).** A custom `DelegatingChatClient` (tracing/logging) plus the framework's built-in `.UseOpenTelemetry()` layered on the same per-deployment client via DI. Demonstrates cross-cutting concerns that have no native AOAI equivalent.
+- **Runtime model selection.** `IChatClientFactory` returns a cached-per-deployment `IChatClient` validated against an allowlist from live ARM discovery (with config-driven fallback). The native AOAI service deliberately doesn't get this — highlighting the abstraction gap.
+- **Operational telemetry, three layers.** Framework instrumentation (ASP.NET Core, HttpClient, .NET runtime), M.E.AI's GenAI semantic-convention metrics, and app-specific meters for catalog/cache/quality signals — all bounded categorical, no tenant/user identifiers.
+- **Data-sovereignty discipline encoded in code.** No `EnableSensitiveData`, no per-tenant metric labels, no secrets in committed config.
 
-## Prerequisites
+## Quick Start (Local Development)
+
+### Prerequisites
 
 - .NET 10 SDK
 - An Azure OpenAI resource with at least one deployment
@@ -18,13 +35,9 @@ ASP.NET Core Web API that compares two SDKs for calling the same Azure OpenAI de
   - Data-plane inference access on the resource (e.g. **Cognitive Services OpenAI User**)
   - ARM read access to list deployments (e.g. **Cognitive Services User**, **Reader**, or **Cognitive Services OpenAI Contributor**)
 
-There are no API keys anywhere in the codebase. Authentication flows entirely through `DefaultAzureCredential`.
+### Configuration
 
-## Configuration
-
-The committed `appsettings.json` contains only the *shape* of required config — all values are intentionally blank. Supply real values out-of-band.
-
-### Local development: `dotnet user-secrets`
+1. **Store secrets securely** (no API keys, Entra ID only):
 
 ```bash
 # Run once per machine from the project directory:
@@ -32,49 +45,84 @@ dotnet user-secrets set "AzureOpenAI:Endpoint"        "https://<your-resource>.o
 dotnet user-secrets set "AzureOpenAI:DeploymentName"  "<default-deployment-name>"
 dotnet user-secrets set "AzureOpenAI:SubscriptionId"  "<subscription-guid>"
 dotnet user-secrets set "AzureOpenAI:ResourceGroup"   "<resource-group-name>"
-# AccountName auto-derives from the Endpoint hostname; set it only if the derivation is wrong.
 ```
 
-Values are stored under your OS user profile (`%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json` on Windows) and are not tracked by git.
+Values are stored securely per OS user and never committed to git.
 
-### Other environments: environment variables
-
-ASP.NET Core reads `__` as the section separator:
-
-```bash
-AzureOpenAI__Endpoint=https://...
-AzureOpenAI__DeploymentName=...
-AzureOpenAI__SubscriptionId=...
-AzureOpenAI__ResourceGroup=...
-```
-
-### Fallback allowlist
-
-If the running identity can't list deployments via ARM, the app still works — the deployment catalog falls back to `AzureOpenAI:AllowedDeployments` (array) or, if that's empty, the single `AzureOpenAI:DeploymentName`.
-
-## Running
+2. **Run the app:**
 
 ```bash
 dotnet run                                # http://localhost:5105
-dotnet run --launch-profile https         # + https://localhost:7263
+dotnet run --launch-profile https         # https://localhost:7263
 ```
 
-Swagger UI is mounted at `/swagger` in Development. Endpoints:
+Swagger UI is at `/swagger` in Development.
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /health` | Liveness probe (200 Healthy when the process is up). |
-| `GET /api/agent/models` | Live ARM deployment discovery with config fallback. |
-| `POST /api/agent/ask-agent-aoai` | Native `Azure.AI.OpenAI` path (static, startup-bound deployment). |
-| `POST /api/agent/ask-agent-ext` | `Microsoft.Extensions.AI` path with full middleware pipeline + runtime `model` selection. |
+## API Endpoints
 
-Request body for the `ask-agent-*` endpoints:
+| Endpoint | Method | Purpose | Concept |
+|---|---|---|---|
+| `/health` | GET | Liveness probe (200 Healthy) | App health checks |
+| `/api/agent/models` | GET | List Azure OpenAI deployments via ARM discovery | ARM SDK, identity, RBAC |
+| `/api/agent/ask-agent-aoai` | POST | Query deployment using native `Azure.AI.OpenAI` SDK | Native AOAI SDK patterns |
+| `/api/agent/ask-agent-ext` | POST | Query deployment using `Microsoft.Extensions.AI` abstraction | Vendor-neutral abstractions, middleware |
+| `/api/sentiment/analyze` | POST | Analyze text sentiment (TBD: add service) | Text analysis patterns |
+
+### Request format for chat endpoints:
 
 ```json
-{ "input": "What is the capital of Mexico?", "model": "gpt-4o" }
+{ 
+  "input": "What is the capital of Mexico?", 
+  "model": "gpt-4o"
+}
 ```
 
-`model` is optional — when omitted, the configured default deployment is used. The native endpoint logs and ignores `model` (deliberately — that's the demo).
+`model` is optional — omit it to use the configured default. The native AOAI endpoint logs and ignores `model` (intentional — highlights the abstraction difference).
+
+## Project Structure
+
+```
+Controllers/
+  ├── AgentController.cs         # Azure OpenAI chat endpoints
+  └── SentimentController.cs     # Sentiment analysis (TBD)
+
+Services/
+  ├── ChatAoaiService.cs         # Native Azure.AI.OpenAI SDK wrapper
+  ├── ChatAoaiExtensionsService.cs  # M.E.AI abstraction wrapper
+  ├── ChatClientFactory.cs       # DI factory for chat clients
+  ├── SentimentService.cs        # Sentiment analysis (TBD)
+  ├── AzureDeploymentCatalog.cs  # ARM discovery + fallback logic
+  └── Interfaces/                # Service contracts
+
+Models/
+  ├── Chat/                      # Chat-related DTOs
+  │   ├── AgentChatMessage.cs
+  │   ├── AgentChatResponse.cs
+  │   ├── AgentTextContent.cs
+  │   ├── AgentFunctionCallContent.cs
+  │   └── ... (other content types)
+  └── Sentiment/
+      └── SentimentResult.cs
+
+Middleware/
+  └── TracingChatClient.cs       # Custom DelegatingChatClient for observability
+
+Diagnostics/
+  └── AppMetrics.cs              # App-specific meter definitions
+```
+
+## AI-102 Learning Focus
+
+This project covers several key AI-102 topics:
+
+- **Azure OpenAI integration** — Working with deployments, models, and API patterns
+- **Identity & security** — Entra ID authentication, RBAC, no-secrets patterns, `DefaultAzureCredential`
+- **ARM SDK usage** — Querying Azure resources programmatically to discover deployments
+- **Abstraction patterns** — Native SDK vs. vendor-neutral abstractions; understanding when/why each matters
+- **Observability** — Structured logging, distributed tracing, semantic conventions, metrics
+- **Error handling** — Fallback strategies, resilience patterns, graceful degradation
+
+As you add new services (sentiment analysis, embeddings, etc.), each will demonstrate a different Azure AI pattern.
 
 ## Observability
 
@@ -89,10 +137,37 @@ The app emits three streams of telemetry, all to stdout via OTel console exporte
 
 In Visual Studio, console-exporter output lands in the **"ASP.NET Core Web Server"** output window; `ILogger` lines (controller and middleware) land in the **"Debug"** output window.
 
-## Security posture
+## Security Posture (AI-102 Concepts)
 
-- **No secrets committed.** API keys are not supported by design — only Entra-ID-backed credentials via `DefaultAzureCredential`.
-- **No infrastructure identifiers committed.** Subscription GUIDs, resource group names, account names, and endpoint URLs live in user-secrets or environment variables.
-- **No customer-content telemetry.** `OpenTelemetryChatClient.EnableSensitiveData` is left at its default (`false`); prompts and completions are never attached to spans.
-- **No tenant or user labels on central metrics.** Bounded categorical dimensions only. Per-tenant token accounting (when needed) belongs in a separate, regional, audit-grade pipeline — not this one.
-- **Gitignored:** `responses/`, `CLAUDE.md`, `bin/`, `obj/`.
+This codebase demonstrates secure-by-design patterns for AI applications:
+
+- **No secrets committed.** API keys not supported — only Entra ID via `DefaultAzureCredential` (covers: managed identities, Visual Studio auth, Azure CLI, workload identity in containers/AKS)
+- **No infrastructure IDs committed.** Subscription GUIDs, resource group names, account names, and URLs live in user-secrets or environment variables
+- **No sensitive telemetry.** `EnableSensitiveData` left at `false` — prompts and completions never attached to spans or metrics
+- **Bounded metrics dimensions.** No tenant/user/content labels on central metrics. Per-tenant accounting belongs in a separate audit pipeline
+- **Gitignored artifacts:** `responses/`, `bin/`, `obj/`, local notes
+
+**Learning takeaway:** This is how production AI apps protect customer data while maintaining full observability for operations.
+
+## Artifacts & Debugging
+
+- **SDK response dumps** — `responses/<ServiceName>.json` contains raw API responses for inspection
+- **Console traces** — Run in Visual Studio's "ASP.NET Core Web Server" output window to see OTel spans in real time
+- **Metrics** — Every 10 seconds, printed to console with `gen_ai.*` semantic conventions
+- **Swagger** — Hit `/swagger` in Development to try endpoints directly
+
+## Next Steps: Expanding the Project
+
+As you continue learning for AI-102, consider adding these patterns:
+
+- [ ] **Azure Cognitive Search** — Implement semantic search + vector search (AI Search service)
+- [ ] **Embeddings service** — Compare native AOAI embeddings SDK vs. M.E.AI
+- [ ] **Streaming responses** — Implement server-sent events (SSE) for streaming chat completions
+- [ ] **Prompt engineering** — Add system prompts, temperature control, token budgeting
+- [ ] **Function calling** — Demonstrate structured tool use and multi-turn conversations
+- [ ] **Sentiment analysis completion** — Finish the `SentimentService` (could use Azure OpenAI, Text Analytics, or both)
+- [ ] **Deployment** — Containerize and deploy to Azure Container Apps or AKS
+- [ ] **Content filtering** — Explore Azure OpenAI's content filtering and safety layers
+- [ ] **Monitoring & alerts** — Hook up to Azure Monitor, Application Insights, or Datadog
+
+Each addition is a learning opportunity. When you add a new feature, update this README with what concept it demonstrates.
