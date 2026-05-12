@@ -14,6 +14,11 @@ public class AskAgentOperationFilter : IOperationFilter
             "AskAgentExt" => "Ask the agent via Microsoft.Extensions.AI (IChatClient abstraction).",
             "GetModels" => "List deployments available to the running identity (live from Azure with config fallback).",
             "AnalyzeSentiment" => "Analyze the sentiment of a text using Azure AI Language.",
+            "GetFeatures" => "Show the Azure AI Vision capabilities exposed by this demo API.",
+            "AnalyzeUrl" => "Analyze a public image URL with Azure AI Vision.",
+            "AnalyzeUpload" => "Analyze an uploaded image file with Azure AI Vision.",
+            "ReadUrl" => "Extract OCR text from a public image URL with Azure AI Vision.",
+            "ReadUpload" => "Extract OCR text from an uploaded image file with Azure AI Vision.",
             _ => null
         };
 
@@ -30,6 +35,32 @@ public class AskAgentOperationFilter : IOperationFilter
             return;
         }
 
+        if (context.MethodInfo.Name == "GetFeatures")
+        {
+            operation.Description = "Returns the supported Vision routes, common format limits, and the feature set this demo is wired to explore first.";
+
+            if (operation.Responses is not null &&
+                operation.Responses.TryGetValue("200", out IOpenApiResponse? okFeaturesResponse) &&
+                okFeaturesResponse?.Content is not null)
+            {
+                foreach (var mediaType in okFeaturesResponse.Content.Values)
+                {
+                    mediaType.Example = new JsonObject
+                    {
+                        ["resourceNotes"] = "Use a Computer Vision or Azure AI Vision resource with DefaultAzureCredential and Cognitive Services User access.",
+                        ["supportedEndpoints"] = new JsonArray(
+                            "/api/vision/analyze/url",
+                            "/api/vision/analyze/upload",
+                            "/api/vision/read/url",
+                            "/api/vision/read/upload"),
+                        ["supportedFormats"] = new JsonArray("JPEG", "PNG", "GIF", "BMP", "WEBP", "ICO", "TIFF", "MPO")
+                    };
+                }
+            }
+
+            return;
+        }
+
         if (context.MethodInfo.Name == "AnalyzeSentiment")
         {
             operation.Description = "Submits text to Azure AI Language and returns the detected sentiment " +
@@ -43,6 +74,70 @@ public class AskAgentOperationFilter : IOperationFilter
                 {
                     ["text"] = "I absolutely loved the new product — it exceeded all my expectations!"
                 };
+            }
+
+            return;
+        }
+
+        if (context.MethodInfo.Name is "AnalyzeUrl" or "ReadUrl")
+        {
+            operation.Description = context.MethodInfo.Name == "AnalyzeUrl"
+                ? "Pass a publicly accessible image URL. The service returns a caption plus the raw Vision JSON payload for inspection in Swagger."
+                : "Pass a publicly accessible image URL. The service returns OCR text lines plus the raw Vision JSON payload for inspection in Swagger.";
+
+            if (operation.RequestBody?.Content is not null &&
+                operation.RequestBody.Content.TryGetValue("application/json", out OpenApiMediaType? visionRequestMediaType) &&
+                visionRequestMediaType is not null)
+            {
+                visionRequestMediaType.Example = new JsonObject
+                {
+                    ["imageUrl"] = context.MethodInfo.Name == "AnalyzeUrl"
+                        ? "https://aka.ms/azsdk/image-analysis/sample.jpg"
+                        : "https://learn.microsoft.com/azure/ai-services/computer-vision/media/quickstarts/presentation.png"
+                };
+            }
+
+            if (operation.Responses is not null &&
+                operation.Responses.TryGetValue("200", out IOpenApiResponse? okVisionResponse) &&
+                okVisionResponse?.Content is not null)
+            {
+                foreach (var mediaType in okVisionResponse.Content.Values)
+                {
+                    mediaType.Example = context.MethodInfo.Name == "AnalyzeUrl"
+                        ? CreateVisionAnalyzeExample()
+                        : CreateVisionReadExample();
+                }
+            }
+
+            return;
+        }
+
+        if (context.MethodInfo.Name is "AnalyzeUpload" or "ReadUpload")
+        {
+            operation.Description = context.MethodInfo.Name == "AnalyzeUpload"
+                ? "Upload an image file as multipart/form-data using the `file` field. Optional query string: `genderNeutralCaption=true`."
+                : "Upload an image file as multipart/form-data using the `file` field to extract OCR text lines.";
+
+            if (operation.Responses is not null &&
+                operation.Responses.TryGetValue("200", out IOpenApiResponse? okUploadResponse) &&
+                okUploadResponse?.Content is not null)
+            {
+                foreach (var mediaType in okUploadResponse.Content.Values)
+                {
+                    mediaType.Example = context.MethodInfo.Name == "AnalyzeUpload"
+                        ? CreateVisionAnalyzeExample()
+                        : CreateVisionReadExample();
+                }
+            }
+
+            if (operation.Responses is not null &&
+                operation.Responses.TryGetValue("400", out IOpenApiResponse? badUploadResponse) &&
+                badUploadResponse?.Content is not null)
+            {
+                foreach (var mediaType in badUploadResponse.Content.Values)
+                {
+                    mediaType.Example = JsonValue.Create("File cannot be empty.");
+                }
             }
 
             return;
@@ -82,5 +177,38 @@ public class AskAgentOperationFilter : IOperationFilter
                 mediaType.Example = JsonValue.Create("Input cannot be empty.");
             }
         }
+    }
+
+    private static JsonObject CreateVisionAnalyzeExample()
+    {
+        return new JsonObject
+        {
+            ["operation"] = "analyze-url",
+            ["sourceKind"] = "url",
+            ["source"] = "https://aka.ms/azsdk/image-analysis/sample.jpg",
+            ["modelVersion"] = "latest",
+            ["caption"] = "A group of people standing on a beach with surfboards.",
+            ["captionConfidence"] = 0.91,
+            ["textLines"] = new JsonArray(),
+            ["rawJson"] = "{\n  \"caption\": { \"text\": \"A group of people standing on a beach with surfboards.\", \"confidence\": 0.91 }\n}"
+        };
+    }
+
+    private static JsonObject CreateVisionReadExample()
+    {
+        return new JsonObject
+        {
+            ["operation"] = "read-url",
+            ["sourceKind"] = "url",
+            ["source"] = "https://learn.microsoft.com/azure/ai-services/computer-vision/media/quickstarts/presentation.png",
+            ["modelVersion"] = "latest",
+            ["caption"] = null,
+            ["captionConfidence"] = null,
+            ["textLines"] = new JsonArray(
+                "Azure AI Vision",
+                "Read API quickstart",
+                "Sample slide content"),
+            ["rawJson"] = "{\n  \"read\": { \"blocks\": [ { \"lines\": [ { \"text\": \"Azure AI Vision\" } ] } ] }\n}"
+        };
     }
 }

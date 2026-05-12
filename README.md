@@ -16,6 +16,7 @@ The codebase is intentionally kept small and focused so you can easily add servi
 | **ChatAoaiExtensionsService** | `AgentController` | M.E.AI abstraction layer | Vendor-neutral AI abstractions, middleware composition |
 | **SentimentService** | `SentimentController` | Dual-provider sentiment analysis | Compare deterministic NLP vs LLM classification |
 | **AzureDeploymentCatalog** | `AgentController` (`/api/agent/models`) | Live ARM discovery + fallback | Azure Resource Manager integration, identity & RBAC |
+| **VisionService** | `VisionController` | Azure AI Vision image analysis and OCR | Analyze-by-URL, file upload, OCR, captions, tags |
 
 ## What This Demonstrates
 
@@ -45,6 +46,7 @@ dotnet user-secrets set "AzureOpenAI:Endpoint"        "https://<your-resource>.o
 dotnet user-secrets set "AzureOpenAI:DeploymentName"  "<default-deployment-name>"
 dotnet user-secrets set "AzureOpenAI:SubscriptionId"  "<subscription-guid>"
 dotnet user-secrets set "AzureOpenAI:ResourceGroup"   "<resource-group-name>"
+dotnet user-secrets set "AzureVision:Endpoint"        "https://<your-vision-resource>.cognitiveservices.azure.com/"
 ```
 
 Values are stored securely per OS user and never committed to git.
@@ -67,6 +69,11 @@ Swagger UI is at `/swagger` in Development.
 | `/api/agent/ask-agent-aoai` | POST | Query deployment using native `Azure.AI.OpenAI` SDK | Native AOAI SDK patterns |
 | `/api/agent/ask-agent-ext` | POST | Query deployment using `Microsoft.Extensions.AI` abstraction | Vendor-neutral abstractions, middleware |
 | `/api/sentiment/analyze` | POST | Analyze sentiment with both Azure AI Language and Azure OpenAI | NLP + LLM comparison patterns |
+| `/api/vision/features` | GET | Show the Vision capabilities, limits, and supported endpoints | Vision setup guidance |
+| `/api/vision/analyze/url` | POST | Analyze a public image URL | Caption, tags, objects, people |
+| `/api/vision/analyze/upload` | POST | Analyze an uploaded image file | Caption, tags, objects, people |
+| `/api/vision/read/url` | POST | Extract text from a public image URL | OCR |
+| `/api/vision/read/upload` | POST | Extract text from an uploaded image file | OCR |
 
 ### Request format for chat endpoints:
 
@@ -127,6 +134,7 @@ Diagnostics/
 This project covers several key AI-102 topics:
 
 - **Azure OpenAI integration** — Working with deployments, models, and API patterns
+- **Azure AI Vision integration** — Testing image analysis, OCR, captions, and file upload patterns
 - **Identity & security** — Entra ID authentication, RBAC, no-secrets patterns, `DefaultAzureCredential`
 - **ARM SDK usage** — Querying Azure resources programmatically to discover deployments
 - **Abstraction patterns** — Native SDK vs. vendor-neutral abstractions; understanding when/why each matters

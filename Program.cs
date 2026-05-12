@@ -6,6 +6,7 @@ using AzureFoundryTest.Controllers;
 using AzureFoundryTest.Diagnostics;
 using Azure.AI.OpenAI;
 using Azure.AI.TextAnalytics;
+using Azure.AI.Vision.ImageAnalysis;
 using Azure.Core;
 using Azure.Identity;
 using OpenTelemetry.Metrics;
@@ -27,10 +28,21 @@ builder.Services.AddSingleton<AzureOpenAIClient>(sp =>
     return new AzureOpenAIClient(new Uri(endpoint), credential);
 });
 
+builder.Services.AddSingleton<ImageAnalysisClient>(sp =>
+{
+    IConfiguration config = sp.GetRequiredService<IConfiguration>();
+    TokenCredential credential = sp.GetRequiredService<TokenCredential>();
+    string endpoint = config["AzureVision:Endpoint"]
+        ?? throw new InvalidOperationException("Configuration value 'AzureVision:Endpoint' is required.");
+
+    return new ImageAnalysisClient(new Uri(endpoint), credential);
+});
+
 builder.Services.AddSingleton<IDeploymentCatalog, AzureDeploymentCatalog>();
 builder.Services.AddSingleton<IChatClientFactory, ChatClientFactory>();
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiService>("aoai");
 builder.Services.AddKeyedScoped<IChatService, ChatAoaiExtensionsService>("ext");
+builder.Services.AddScoped<IVisionService, VisionService>();
 
 builder.Services.AddSingleton<TextAnalyticsClient>(sp =>
 {
