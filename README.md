@@ -15,6 +15,7 @@ The codebase is intentionally kept small and focused so you can easily add servi
 | **ChatAoaiService** | `AgentController` | Native Azure OpenAI SDK | Direct AOAI API patterns, response shapes |
 | **ChatAoaiExtensionsService** | `AgentController` | M.E.AI abstraction layer | Vendor-neutral AI abstractions, middleware composition |
 | **SentimentService** | `SentimentController` | Dual-provider sentiment analysis | Compare deterministic NLP vs LLM classification |
+| **PiiService** | `PiiController` | Detect and redact personally identifiable information (PII) | Azure AI Language PII entity recognition |
 | **AzureDeploymentCatalog** | `AgentController` (`/api/agent/models`) | Live ARM discovery + fallback | Azure Resource Manager integration, identity & RBAC |
 | **VisionService** | `VisionController` | Azure AI Vision image analysis and OCR | Analyze-by-URL, file upload, OCR, captions, tags |
 
@@ -69,6 +70,7 @@ Swagger UI is at `/swagger` in Development.
 | `/api/agent/ask-agent-aoai` | POST | Query deployment using native `Azure.AI.OpenAI` SDK | Native AOAI SDK patterns |
 | `/api/agent/ask-agent-ext` | POST | Query deployment using `Microsoft.Extensions.AI` abstraction | Vendor-neutral abstractions, middleware |
 | `/api/sentiment/analyze` | POST | Analyze sentiment with both Azure AI Language and Azure OpenAI | NLP + LLM comparison patterns |
+| `/api/pii/analyze` | POST | Detect and redact PII entities in text | NLP PII entity recognition |
 | `/api/vision/features` | GET | Show the Vision capabilities, limits, and supported endpoints | Vision setup guidance |
 | `/api/vision/analyze/url` | POST | Analyze a public image URL | Caption, tags, objects, people |
 | `/api/vision/analyze/upload` | POST | Analyze an uploaded image file | Caption, tags, objects, people |

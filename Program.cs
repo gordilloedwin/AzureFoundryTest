@@ -35,7 +35,8 @@ builder.Services.AddSingleton<ImageAnalysisClient>(sp =>
     string endpoint = config["AzureVision:Endpoint"]
         ?? throw new InvalidOperationException("Configuration value 'AzureVision:Endpoint' is required.");
 
-    return new ImageAnalysisClient(new Uri(endpoint), credential);
+    var options = new ImageAnalysisClientOptions(ImageAnalysisClientOptions.ServiceVersion.V2023_10_01); // v4.0
+    return new ImageAnalysisClient(new Uri(endpoint), credential, options);
 });
 
 builder.Services.AddSingleton<IDeploymentCatalog, AzureDeploymentCatalog>();
@@ -53,6 +54,7 @@ builder.Services.AddSingleton<TextAnalyticsClient>(sp =>
     return new TextAnalyticsClient(new Uri(endpoint), credential);
 });
 builder.Services.AddScoped<ISentimentService, SentimentService>();
+builder.Services.AddScoped<IPiiService, PiiService>();
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
