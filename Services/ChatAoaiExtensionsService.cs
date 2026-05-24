@@ -37,9 +37,15 @@ public class ChatAoaiExtensionsService : IChatService
 			new ChatMessage(ChatRole.User, input)
 		];
 
-		ChatResponse raw = await chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+		// Tool-call plumbing is enabled; start with an empty tool list and add tools as needed.
+		ChatOptions options = new()
+		{
+			Tools = [],
+			ToolMode = ChatToolMode.Auto,
+			AllowMultipleToolCalls = false,
+		};
 
-		//var x = chatClient
+		ChatResponse raw = await chatClient.GetResponseAsync(messages, options, cancellationToken);
 
 		AgentChatResponse response = raw.ToAgent(deployment);
 

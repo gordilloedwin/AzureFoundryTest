@@ -65,6 +65,7 @@ public sealed class ChatClientFactory : IChatClientFactory
 			IChatClient inner = _azureClient.GetChatClient(name).AsIChatClient();
 			return new ChatClientBuilder(inner)
 				.UseOpenTelemetry(loggerFactory: _services.GetRequiredService<ILoggerFactory>())
+				.UseFunctionInvocation(loggerFactory: _services.GetRequiredService<ILoggerFactory>())
 				.Use(c => ActivatorUtilities.CreateInstance<TracingChatClient>(_services, c))
 				.Build();
 		});
