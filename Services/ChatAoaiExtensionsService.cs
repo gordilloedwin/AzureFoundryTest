@@ -45,8 +45,8 @@ public class ChatAoaiExtensionsService : IChatService
 			AllowMultipleToolCalls = false,
 		};
 
+		//ChatResponse raw = await chatClient.GetResponseAsync<ChatResponse>(messages, options, false, cancellationToken);
 		ChatResponse raw = await chatClient.GetResponseAsync(messages, options, cancellationToken);
-
 		AgentChatResponse response = raw.ToAgent(deployment);
 
 		await WriteResponseAsync(response, cancellationToken);
