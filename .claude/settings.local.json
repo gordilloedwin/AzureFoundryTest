@@ -5,7 +5,14 @@
       "Bash(dotnet build *)",
       "Bash(dotnet list *)",
       "mcp__claude_ai_Microsoft_Learn__microsoft_docs_search",
-      "Bash(dotnet user-secrets *)"
+      "Bash(dotnet user-secrets *)",
+      "Bash(dotnet package *)",
+      "Bash(dotnet restore *)",
+      "Bash(find ~/.nuget/packages/azure.ai.extensions.openai -name \"*.dll\" 2>/dev/null | head -5)",
+      "Read(//home/edwin/.nuget/packages/azure.ai.extensions.openai/**)",
+      "Bash(find ~/.nuget/packages/azure.ai.projects -name \"*.dll\" 2>/dev/null | head -5)",
+      "Read(//home/edwin/.nuget/packages/azure.ai.projects/**)",
+      "Bash(dotnet script *)"
     ]
   }
 }

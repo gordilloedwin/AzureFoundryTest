@@ -5,6 +5,7 @@ using AzureFoundryTest.Middleware;
 using AzureFoundryTest.Controllers;
 using AzureFoundryTest.Diagnostics;
 using Azure.AI.OpenAI;
+using Azure.AI.Projects;
 using Azure.AI.TextAnalytics;
 using Azure.AI.Vision.ImageAnalysis;
 using Azure.Core;
@@ -55,6 +56,16 @@ builder.Services.AddSingleton<TextAnalyticsClient>(sp =>
 });
 builder.Services.AddScoped<ISentimentService, SentimentService>();
 builder.Services.AddScoped<IPiiService, PiiService>();
+
+builder.Services.AddSingleton<AIProjectClient>(sp =>
+{
+    IConfiguration config = sp.GetRequiredService<IConfiguration>();
+    TokenCredential credential = sp.GetRequiredService<TokenCredential>();
+    string endpoint = config["AzureFoundry:Endpoint"]
+        ?? throw new InvalidOperationException("Configuration value 'AzureFoundry:Endpoint' is required.");
+    return new AIProjectClient(new Uri(endpoint), credential);
+});
+builder.Services.AddScoped<IFoundryService, FoundryService>();
 
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
