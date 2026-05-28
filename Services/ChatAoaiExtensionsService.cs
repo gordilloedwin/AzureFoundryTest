@@ -41,8 +41,7 @@ public class ChatAoaiExtensionsService : IChatService
 		ChatOptions options = new()
 		{
 			Tools = [],
-			ToolMode = ChatToolMode.Auto,
-			AllowMultipleToolCalls = false,
+			ToolMode = ChatToolMode.Auto, // Auto means the model decides when to call tools based on the conversation and available tools.			AllowMultipleToolCalls = false,
 		};
 
 		//ChatResponse raw = await chatClient.GetResponseAsync<ChatResponse>(messages, options, false, cancellationToken);

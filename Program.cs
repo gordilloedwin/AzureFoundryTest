@@ -50,12 +50,21 @@ builder.Services.AddSingleton<TextAnalyticsClient>(sp =>
 {
     IConfiguration config = sp.GetRequiredService<IConfiguration>();
     TokenCredential credential = sp.GetRequiredService<TokenCredential>();
-    string endpoint = config["AzureLanguage:Endpoint"]
-        ?? throw new InvalidOperationException("Configuration value 'AzureLanguage:Endpoint' is required.");
+    string? endpoint = config["AzureFoundry:LanguageEndpoint"]
+        ?? config["AzureLanguage:Endpoint"];
+
+    if (string.IsNullOrWhiteSpace(endpoint))
+    {
+        throw new InvalidOperationException(
+            "Configuration value 'AzureFoundry:LanguageEndpoint' (preferred) or 'AzureLanguage:Endpoint' is required.");
+    }
+
     return new TextAnalyticsClient(new Uri(endpoint), credential);
 });
 builder.Services.AddScoped<ISentimentService, SentimentService>();
-builder.Services.AddScoped<IPiiService, PiiService>();
+// FoundryPiiService resolves the Language endpoint from the Foundry connection named
+// AzureFoundry:PiiConnectionName (defaults to "Azure-Language-Text-PII-redaction").
+builder.Services.AddScoped<IPiiService, FoundryPiiService>();
 
 builder.Services.AddSingleton<AIProjectClient>(sp =>
 {

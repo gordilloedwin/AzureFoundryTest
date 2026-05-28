@@ -47,10 +47,12 @@ dotnet user-secrets set "AzureOpenAI:Endpoint"        "https://<your-resource>.o
 dotnet user-secrets set "AzureOpenAI:DeploymentName"  "<default-deployment-name>"
 dotnet user-secrets set "AzureOpenAI:SubscriptionId"  "<subscription-guid>"
 dotnet user-secrets set "AzureOpenAI:ResourceGroup"   "<resource-group-name>"
+dotnet user-secrets set "AzureFoundry:LanguageEndpoint" "https://<your-language-resource>.cognitiveservices.azure.com/"
 dotnet user-secrets set "AzureVision:Endpoint"        "https://<your-vision-resource>.cognitiveservices.azure.com/"
 ```
 
 Values are stored securely per OS user and never committed to git.
+For the PII endpoint, `AzureFoundry:LanguageEndpoint` is preferred and `AzureLanguage:Endpoint` is used as fallback.
 
 2. **Run the app:**
 
